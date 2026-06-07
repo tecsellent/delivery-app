@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel del Restaurante</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, sans-serif; background: #f0f2f5; }
+
+    #header {
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #header h1 { font-size: 18px; font-weight: 700; color: #222; }
+    #header span { font-size: 13px; color: #888; }
+
+    .contenido { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+
+    /* Formulario nuevo pedido */
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .card h2 { font-size: 16px; font-weight: 700; color: #222; margin-bottom: 16px; }
+
+    .fila { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .fila.una { grid-template-columns: 1fr; }
+
+    label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; font-weight: 600; text-transform: uppercase; }
+    input, textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 15px;
+      color: #222;
+      background: #fafafa;
+      transition: border 0.2s;
+    }
+    input:focus, textarea:focus { outline: none; border-color: #ff6b35; background: white; }
+    textarea { resize: none; height: 80px; }
+
+    #btn-crear {
+      width: 100%;
+      padding: 16px;
+      background: #ff6b35;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: opacity 0.2s;
+    }
+    #btn-crear:hover { opacity: 0.9; }
+    #btn-crear:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Modal de link */
+    #modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    #modal.activo { display: flex; }
+    .modal-box {
+      background: white;
+      border-radius: 20px;
+      padding: 32px 24px;
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+    }
+    .modal-box .emoji { font-size: 48px; margin-bottom: 12px; }
+    .modal-box h2 { font-size: 20px; margin-bottom: 8px; }
+    .modal-box p  { font-size: 14px; color: #666; margin-bottom: 20px; }
+    .link-box {
+      background: #f0f2f5;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 13px;
+      font-family: monospace;
+      word-break: break-all;
+      margin-bottom: 16px;
+      color: #333;
+    }
+    .modal-btns { display: flex; gap: 10px; }
+    .modal-btns button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #btn-copiar   { background: #ff6b35; color: white; }
+    #btn-cerrar   { background: #f0f2f5; color: #333; }
+
+    /* Lista de pedidos */
+    #lista-pedidos { display: flex; flex-direction: column; gap: 12px; }
+
+    .pedido-item {
+      background: white;
+      border-radius: 14px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .pedido-info h3 { font-size: 15px; font-weight: 600; color: #222; }
+    .pedido-info p  { font-size: 13px; color: #888; margin-top: 2px; }
+    .badge {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+    .badge.pendiente  { background: #fff3cd; color: #856404; }
+    .badge.en_camino  { background: #d1f2eb; color: #1e6050; }
+    .badge.entregado  { background: #e8f4fd; color: #1a5276; }
+
+    .pedido-acciones { display: flex; gap: 8px; align-items: center; flex-direction: column; }
+    .btn-tracking {
+      font-size: 12px;
+      padding: 6px 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      color: #555;
+      text-decoration: none;
+    }
+
+    .empty { text-align: center; color: #aaa; padding: 40px; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🍕 Panel del Restaurante</h1>
+  <span id="total-hoy">Cargando pedidos...</span>
+</div>
+
+<div class="contenido">
+
+  <!-- Formulario nuevo pedido -->
+  <div class="card">
+    <h2>Nuevo Pedido</h2>
+    <div class="fila">
+      <div>
+        <label>Nombre del cliente</label>
+        <input id="f-nombre" type="text" placeholder="Ej: María García" />
+      </div>
+      <div>
+        <label>Teléfono del cliente</label>
+        <input id="f-telefono" type="tel" placeholder="Ej: 5512345678" />
+      </div>
+    </div>
+    <div class="fila una">
+      <div>
+        <label>Descripción del pedido</label>
+        <textarea id="f-descripcion" placeholder="Ej: 2 pizzas margarita, 1 refresco grande"></textarea>
+      </div>
+    </div>
+    <button id="btn-crear">Crear Pedido y Obtener Link de Tracking</button>
+  </div>
+
+  <!-- Lista de pedidos -->
+  <div class="card">
+    <h2>Pedidos de Hoy</h2>
+    <div id="lista-pedidos">
+      <p class="empty">Cargando...</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal con link -->
+<div id="modal">
+  <div class="modal-box">
+    <div class="emoji">🎉</div>
+    <h2>¡Pedido creado!</h2>
+    <p>Comparte este link con el repartidor y el cliente:</p>
+    <div class="link-box" id="link-generado">—</div>
+    <div class="modal-btns">
+      <button id="btn-copiar">Copiar link</button>
+      <button id="btn-cerrar">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = 'https://delivery-app-production-3d0c.up.railway.app';
+  let linkActual = '';
+
+  async function cargarPedidos() {
+    try {
+      const res  = await fetch(`${API}/pedidos`);
+      const data = await res.json();
+      const lista = document.getElementById('lista-pedidos');
+
+      document.getElementById('total-hoy').textContent =
+        `${data.length} pedido${data.length !== 1 ? 's' : ''} hoy`;
+
+      if (data.length === 0) {
+        lista.innerHTML = '<p class="empty">No hay pedidos aún. ¡Crea el primero!</p>';
+        return;
+      }
+
+      lista.innerHTML = data.map(p => `
+        <div class="pedido-item">
+          <div class="pedido-info">
+            <h3>${p.cliente_nombre}</h3>
+            <p>${p.descripcion || 'Sin descripción'} · ${p.cliente_telefono}</p>
+          </div>
+          <div class="pedido-acciones">
+            <span class="badge ${p.estado}">${p.estado.replace('_', ' ')}</span>
+            <a class="btn-tracking" href="tracking.html?link=${p.link_tracking}" target="_blank">Ver mapa</a>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      document.getElementById('lista-pedidos').innerHTML =
+        '<p class="empty">Error al cargar pedidos</p>';
+    }
+  }
+
+  // Crear pedido
+  document.getElementById('btn-crear').addEventListener('click', async () => {
+    const nombre      = document.getElementById('f-nombre').value.trim();
+    const telefono    = document.getElementById('f-telefono').value.trim();
+    const descripcion = document.getElementById('f-descripcion').value.trim();
+
+    if (!nombre || !telefono) return alert('El nombre y teléfono son obligatorios');
+
+    const btn = document.getElementById('btn-crear');
+    btn.disabled    = true;
+    btn.textContent = 'Creando...';
+
+    try {
+      const res  = await fetch(`${API}/pedidos`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ cliente_nombre: nombre, cliente_telefono: telefono, descripcion, restaurante_id: null })
+      });
+      const data = await res.json();
+
+      linkActual = `file:///Users/alain/delivery-app/web/tracking.html?link=${data.pedido.link_tracking}`;
+      document.getElementById('link-generado').textContent = linkActual;
+      document.getElementById('modal').classList.add('activo');
+
+      document.getElementById('f-nombre').value      = '';
+      document.getElementById('f-telefono').value    = '';
+      document.getElementById('f-descripcion').value = '';
+
+      cargarPedidos();
+    } catch (e) {
+      alert('Error al crear el pedido');
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Crear Pedido y Obtener Link de Tracking';
+    }
+  });
+
+  document.getElementById('btn-copiar').addEventListener('click', () => {
+    navigator.clipboard.writeText(linkActual).then(() => {
+      document.getElementById('btn-copiar').textContent = '¡Copiado!';
+      setTimeout(() => document.getElementById('btn-copiar').textContent = 'Copiar link', 2000);
+    });
+  });
+
+  document.getElementById('btn-cerrar').addEventListener('click', () => {
+    document.getElementById('modal').classList.remove('activo');
+  });
+
+  cargarPedidos();
+</script>
+</body>
+</html>
