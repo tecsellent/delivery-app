@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seguimiento de tu pedido</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, sans-serif; background: #f5f5f5; }
+
+    #header {
+      background: #ff6b35;
+      color: white;
+      padding: 16px 20px;
+      text-align: center;
+    }
+    #header h1 { font-size: 18px; font-weight: 600; }
+    #header p  { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+
+    #mapa { height: 55vh; width: 100%; }
+
+    #info {
+      background: white;
+      padding: 20px;
+      border-radius: 16px 16px 0 0;
+      margin-top: -10px;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+      min-height: 30vh;
+    }
+    #estado {
+      display: inline-block;
+      background: #fff3ee;
+      color: #ff6b35;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 12px;
+    }
+    #info h2 { font-size: 16px; color: #222; margin-bottom: 4px; }
+    #info p  { font-size: 14px; color: #666; }
+
+    #entregado {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    #entregado .emoji { font-size: 64px; margin-bottom: 16px; }
+    #entregado h2 { font-size: 22px; color: #222; margin-bottom: 8px; }
+    #entregado p  { font-size: 14px; color: #666; margin-bottom: 24px; }
+    #entregado a  {
+      background: #ff6b35;
+      color: white;
+      padding: 12px 28px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>Tu pedido va en camino 🛵</h1>
+  <p id="nombre-cliente">Cargando...</p>
+</div>
+
+<div id="vista-mapa">
+  <div id="mapa"></div>
+  <div id="info">
+    <span id="estado">En camino</span>
+    <h2 id="descripcion">—</h2>
+    <p id="ultima-actualizacion">Actualizando ubicación...</p>
+  </div>
+</div>
+
+<div id="entregado">
+  <div class="emoji">🎉</div>
+  <h2>¡Pedido entregado!</h2>
+  <p>Gracias por tu compra. ¿Cómo fue tu experiencia?</p>
+  <a href="#">⭐ Calificar pedido</a>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const link = params.get('link') || window.location.pathname.split('/').pop();
+  const API   = 'http://localhost:3000';
+
+  // Inicializar mapa centrado en México
+  const mapa    = L.map('mapa').setView([19.4326, -99.1332], 14);
+  let marcador  = null;
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(mapa);
+
+  const iconoMoto = L.divIcon({
+    className: '',
+    html: '<div style="font-size:32px">🛵</div>',
+    iconAnchor: [16, 16]
+  });
+
+  async function actualizar() {
+    try {
+      const res  = await fetch(`${API}/tracking/${link}`);
+      const data = await res.json();
+
+      if (!data.pedido) return;
+
+      document.getElementById('nombre-cliente').textContent =
+        `Pedido de ${data.pedido.cliente_nombre}`;
+      document.getElementById('descripcion').textContent =
+        data.pedido.descripcion || 'Sin descripción';
+
+      if (data.pedido.estado === 'entregado') {
+        document.getElementById('vista-mapa').style.display = 'none';
+        document.getElementById('entregado').style.display  = 'flex';
+        return;
+      }
+
+      if (data.ubicacion) {
+        const { latitud, longitud, registrado_en } = data.ubicacion;
+        const pos = [latitud, longitud];
+
+        if (marcador) {
+          marcador.setLatLng(pos);
+        } else {
+          marcador = L.marker(pos, { icon: iconoMoto }).addTo(mapa);
+        }
+
+        mapa.setView(pos, 15);
+
+        const hace = Math.round((Date.now() - new Date(registrado_en)) / 1000);
+        document.getElementById('ultima-actualizacion').textContent =
+          `Actualizado hace ${hace} segundos`;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  actualizar();
+  setInterval(actualizar, 15000); // actualiza cada 15 segundos
+</script>
+</body>
+</html>
