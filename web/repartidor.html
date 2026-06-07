@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Repartidor - Delivery App</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, sans-serif;
+      background: #1a1a2e;
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #header {
+      background: #ff6b35;
+      padding: 20px;
+      text-align: center;
+    }
+    #header h1 { font-size: 20px; font-weight: 700; }
+    #header p  { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+
+    #contenido {
+      flex: 1;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .tarjeta {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 20px;
+    }
+    .tarjeta h2 { font-size: 14px; color: #aaa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+    .tarjeta p  { font-size: 18px; font-weight: 600; }
+
+    #estado-gps {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: #aaa;
+    }
+    .punto {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #555;
+      transition: background 0.3s;
+    }
+    .punto.activo { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
+
+    #btn-iniciar, #btn-entregado {
+      width: 100%;
+      padding: 20px;
+      border: none;
+      border-radius: 16px;
+      font-size: 20px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    #btn-iniciar  { background: #2ecc71; color: white; }
+    #btn-entregado { background: #e74c3c; color: white; display: none; }
+    #btn-iniciar:active, #btn-entregado:active { transform: scale(0.97); }
+    #btn-iniciar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #log {
+      font-size: 12px;
+      color: #555;
+      text-align: center;
+      padding-bottom: 20px;
+    }
+
+    /* Pantalla de configuración */
+    #pantalla-config { display: flex; flex-direction: column; gap: 16px; }
+    #pantalla-config input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: none;
+      background: #16213e;
+      color: white;
+      font-size: 16px;
+    }
+    #pantalla-config input::placeholder { color: #555; }
+    #btn-cargar {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      background: #ff6b35;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    #pantalla-ruta { display: none; flex-direction: column; gap: 20px; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🛵 Panel del Repartidor</h1>
+  <p id="subtitulo">Ingresa tu pedido para comenzar</p>
+</div>
+
+<div id="contenido">
+
+  <!-- Pantalla 1: ingresar link del pedido -->
+  <div id="pantalla-config">
+    <div class="tarjeta">
+      <h2>Código del pedido</h2>
+      <input id="input-link" type="text" placeholder="Ej: lqxct50a" />
+    </div>
+    <button id="btn-cargar">Cargar pedido →</button>
+  </div>
+
+  <!-- Pantalla 2: ruta activa -->
+  <div id="pantalla-ruta">
+    <div class="tarjeta">
+      <h2>Cliente</h2>
+      <p id="nombre-cliente">—</p>
+    </div>
+    <div class="tarjeta">
+      <h2>Pedido</h2>
+      <p id="descripcion-pedido">—</p>
+    </div>
+    <div class="tarjeta">
+      <div id="estado-gps">
+        <div class="punto" id="punto-gps"></div>
+        <span id="texto-gps">GPS desactivado</span>
+      </div>
+    </div>
+    <button id="btn-iniciar">▶ Iniciar Ruta</button>
+    <button id="btn-entregado">✓ Marcar como Entregado</button>
+    <p id="log">Presiona "Iniciar Ruta" para comenzar a enviar tu ubicación</p>
+  </div>
+
+</div>
+
+<script>
+  const API = 'http://localhost:3000';
+  let pedidoId  = null;
+  let intervalo = null;
+
+  // Cargar pedido
+  document.getElementById('btn-cargar').addEventListener('click', async () => {
+    const link = document.getElementById('input-link').value.trim();
+    if (!link) return alert('Ingresa el código del pedido');
+
+    try {
+      const res  = await fetch(`${API}/tracking/${link}`);
+      const data = await res.json();
+      if (!data.pedido) return alert('Pedido no encontrado');
+
+      pedidoId = data.pedido.id;
+      document.getElementById('nombre-cliente').textContent    = data.pedido.cliente_nombre;
+      document.getElementById('descripcion-pedido').textContent = data.pedido.descripcion;
+      document.getElementById('subtitulo').textContent          = `Pedido de ${data.pedido.cliente_nombre}`;
+
+      document.getElementById('pantalla-config').style.display = 'none';
+      document.getElementById('pantalla-ruta').style.display   = 'flex';
+    } catch (e) {
+      alert('Error al cargar el pedido');
+    }
+  });
+
+  // Iniciar ruta — activa GPS
+  document.getElementById('btn-iniciar').addEventListener('click', () => {
+    if (!navigator.geolocation) return alert('Tu navegador no soporta GPS');
+
+    document.getElementById('btn-iniciar').disabled            = true;
+    document.getElementById('btn-iniciar').textContent         = '📡 Enviando ubicación...';
+    document.getElementById('btn-entregado').style.display     = 'block';
+    document.getElementById('punto-gps').classList.add('activo');
+    document.getElementById('texto-gps').textContent           = 'GPS activo — enviando cada 15s';
+
+    enviarUbicacion(); // envío inmediato
+    intervalo = setInterval(enviarUbicacion, 15000);
+  });
+
+  async function enviarUbicacion() {
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { latitude, longitude } = pos.coords;
+      try {
+        await fetch(`${API}/ubicacion`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pedido_id: pedidoId, latitud: latitude, longitud: longitude })
+        });
+        const ahora = new Date().toLocaleTimeString();
+        document.getElementById('log').textContent = `Última actualización: ${ahora}`;
+      } catch (e) {
+        document.getElementById('log').textContent = 'Error al enviar ubicación';
+      }
+    }, () => {
+      document.getElementById('log').textContent = 'No se pudo obtener el GPS';
+    });
+  }
+
+  // Marcar como entregado
+  document.getElementById('btn-entregado').addEventListener('click', async () => {
+    if (!confirm('¿Confirmas que el pedido fue entregado?')) return;
+
+    clearInterval(intervalo);
+    try {
+      await fetch(`${API}/pedidos/${pedidoId}/entregado`, { method: 'POST' });
+      document.getElementById('btn-entregado').textContent  = '✓ Entregado';
+      document.getElementById('btn-entregado').disabled     = true;
+      document.getElementById('punto-gps').classList.remove('activo');
+      document.getElementById('texto-gps').textContent      = 'Ruta finalizada';
+      document.getElementById('log').textContent            = '¡Pedido completado! GPS desactivado.';
+    } catch (e) {
+      alert('Error al marcar como entregado');
+    }
+  });
+</script>
+</body>
+</html>
