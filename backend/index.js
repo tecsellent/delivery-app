@@ -4,9 +4,11 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const ws = require('ws');
 
+const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../web')));
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY, {
   realtime: { transport: ws }
@@ -15,6 +17,17 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 // Verificar que el servidor funciona
 app.get('/', (req, res) => {
   res.json({ mensaje: 'Backend de Delivery App funcionando ✓' });
+});
+
+// Listar todos los pedidos
+app.get('/pedidos', async (req, res) => {
+  const { data, error } = await supabase
+    .from('pedidos')
+    .select('*')
+    .order('creado_en', { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
 });
 
 // Crear un pedido nuevo
