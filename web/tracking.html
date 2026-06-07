@@ -89,7 +89,7 @@
 <script>
   const params = new URLSearchParams(window.location.search);
   const link = params.get('link') || window.location.pathname.split('/').pop();
-  const API   = 'http://localhost:3000';
+  const API   = 'https://delivery-app-production-3d0c.up.railway.app';
 
   // Inicializar mapa centrado en México
   const mapa    = L.map('mapa').setView([19.4326, -99.1332], 14);
